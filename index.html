@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Take Photo & Upload</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 20px;
+    }
+    video, canvas, img {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 16px;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Take a Photo</h2>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" style="display:none;"></canvas>
+<img id="preview" />
+
+<br/>
+
+<button id="snap">Take Photo</button>
+<button id="upload" disabled>Upload</button>
+
+<script>
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const preview = document.getElementById("preview");
+  const snapBtn = document.getElementById("snap");
+  const uploadBtn = document.getElementById("upload");
+
+  // Start camera
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      video.srcObject = stream;
+    })
+    .catch(err => {
+      alert("Camera access denied");
+      console.error(err);
+    });
+
+  // Take photo
+  snapBtn.onclick = () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
+
+    preview.src = canvas.toDataURL("image/jpeg");
+    uploadBtn.disabled = false;
+  };
+
+  // Upload photo
+  uploadBtn.onclick = async () => {
+    const blob = await new Promise(resolve =>
+      canvas.toBlob(resolve, "image/jpeg", 0.9)
+    );
+
+    const formData = new FormData();
+    formData.append("photo", blob, "photo.jpg");
+
+    const response = await fetch("https://your-api.example/upload", {
+      method: "POST",
+      body: formData
+    });
+
+    if (response.ok) {
+      alert("Upload successful!");
+    } else {
+      alert("Upload failed");
+    }
+  };
+</script>
+
+</body>
+</html>
