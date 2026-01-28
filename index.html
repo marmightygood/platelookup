@@ -2,26 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Capture & Upload</title>
+  <title>Vehicle Scan</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
   <style>
     :root {
-      --bg: #0f172a;
+      --bg: #020617;
       --card: #020617;
       --accent: #38bdf8;
+      --good: #22c55e;
+      --bad: #ef4444;
       --text: #e5e7eb;
       --muted: #94a3b8;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
       font-family: system-ui, -apple-system, sans-serif;
-      background: linear-gradient(180deg, #020617, #020617);
+      background: var(--bg);
       color: var(--text);
     }
 
@@ -33,192 +33,82 @@
       gap: 12px;
     }
 
-    header {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
     h1 {
       font-size: 1.2rem;
       margin: 0;
+      text-align: center;
     }
 
-    input {
+    video {
       width: 100%;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid #1e293b;
-      background: #020617;
-      color: var(--text);
-      font-size: 14px;
-    }
-
-    video, img {
-      width: 100%;
-      border-radius: 12px;
-      background: black;
       aspect-ratio: 3 / 4;
       object-fit: cover;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 12px;
+      border-radius: 14px;
+      background: black;
     }
 
     button {
-      flex: 1;
-      padding: 14px;
-      font-size: 16px;
+      padding: 16px;
+      font-size: 17px;
       font-weight: 600;
-      border-radius: 12px;
+      border-radius: 14px;
       border: none;
+      background: var(--accent);
+      color: #020617;
       cursor: pointer;
     }
 
-    .primary {
-      background: var(--accent);
-      color: #020617;
-    }
-
-    .secondary {
-      background: #1e293b;
-      color: var(--text);
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .status {
-      font-size: 13px;
-      color: var(--muted);
       text-align: center;
+      font-size: 14px;
+      color: var(--muted);
     }
+
+    .results {
+      margin-top: 8px;
+      padding: 14px;
+      border-radius: 14px;
+      background: #020617;
+      border: 1px solid #1e293b;
+    }
+
+    .plate {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .stolen {
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    .stolen.yes { color: var(--bad); }
+    .stolen.no { color: var(--good); }
   </style>
 </head>
 <body>
 
 <div class="app">
-  <header>
-    <h1>Photo Capture</h1>
-    <input id="apiHost" placeholder="API host (e.g. https://api.example.com)" />
-  </header>
+  <h1>Vehicle Scan</h1>
 
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas" hidden></canvas>
-  <img id="preview" hidden />
 
-  <div class="buttons">
-    <button class="secondary" id="capture">📸 Capture</button>
-    <button class="primary" id="upload" disabled>⬆ Upload</button>
-  </div>
+  <button id="capture">📸 Scan Vehicle</button>
 
-  <div class="status" id="status">Waiting for camera…</div>
+  <div class="status" id="status">Initialising…</div>
+
+  <div class="results" id="results" hidden></div>
 </div>
 
-<script>
-  const video = document.getElementById("video");
-  const canvas = document.getElementById("canvas");
-  const preview = document.getElementById("preview");
-  const captureBtn = document.getElementById("capture");
-  const uploadBtn = document.getElementById("upload");
-  const statusEl = document.getElementById("status");
-  const apiHostInput = document.getElementById("apiHost");
-
-  let currentLocation = null;
-
-  // Restore last API host
-  apiHostInput.value = localStorage.getItem("apiHost") || "";
-
-  apiHostInput.onchange = () => {
-    localStorage.setItem("apiHost", apiHostInput.value);
-  };
-
-  // Start camera (rear camera preferred)
-  navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: "environment" } }
-  })
-  .then(stream => {
-    video.srcObject = stream;
-    statusEl.textContent = "Camera ready";
-  })
-  .catch(err => {
-    statusEl.textContent = "Camera access denied";
-    console.error(err);
-  });
-
-  // Get GPS once
-  if ("geolocation" in navigator) {
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        currentLocation = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy
-        };
-        statusEl.textContent = "GPS locked";
-      },
-      err => {
-        statusEl.textContent = "GPS unavailable";
-        console.warn(err);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }
-
-  // Capture photo
-  captureBtn.onclick = () => {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0);
-
-    preview.src = canvas.toDataURL("image/jpeg", 0.9);
-    preview.hidden = false;
-    video.hidden = true;
-
-    uploadBtn.disabled = false;
-    statusEl.textContent = "Photo captured";
-  };
-
-  // Upload
-  uploadBtn.onclick = async () => {
-    const apiHost = apiHostInput.value.trim();
-    if (!apiHost) {
-      alert("Please enter API host");
-      return;
-    }
-
-    statusEl.textContent = "Uploading…";
-
-    const blob = await new Promise(res =>
-      canvas.toBlob(res, "image/jpeg", 0.9)
-    );
-
-    const formData = new FormData();
-    formData.append("photo", blob, "photo.jpg");
-    formData.append("timestamp", new Date().toISOString());
-
-    if (currentLocation) {
-      formData.append("latitude", currentLocation.latitude);
-      formData.append("longitude", currentLocation.longitude);
-      formData.append("accuracy", currentLocation.accuracy);
-    }
-
-    try {
-      const response = await fetch(`${apiHost}/upload`, {
-        method: "POST",
-        body: formData
-      });
-
-      if (!response.ok) throw new Error("Upload failed");
-
-      statusEl.textContent = "Upload successful ✅";
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent = "Upload failed ❌";
-    }
-  };
-</script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 
 </body>
 </html>
